@@ -5,7 +5,33 @@ import { berlinLocalToUtc, cleanerSlotAvailable } from "@/domain/scheduling";
 import { coversPostcode } from "@/domain/coverage";
 
 export async function GET(request: NextRequest) {
-  const postcode = request.nextUrl.searchParams.get("postcode") ?? "";
+  const postcode = (request.nextUrl.searchParams.get("postcode") ?? "").trim();
+  if (request.nextUrl.searchParams.get("check") === "coverage") {
+    if (!/^\d{5}$/.test(postcode)) return NextResponse.json({ error: "invalid_postcode" }, { status: 400 });
+
+    try {
+      const available = await prisma.$transaction(async tx => {
+        const cleaners = await tx.cleaner.findMany({
+          where: { account: { state: AccountState.ACTIVE }, onboarding: OnboardingStatus.APPROVED, connectPayoutsEnabled: true, acceptingBookings: true },
+          select: { basePostcode: true, serviceRadiusKm: true, areas: { select: { postcodePrefix: true } } },
+        });
+        const postcodes = [...new Set([postcode, ...cleaners.flatMap(cleaner => cleaner.basePostcode ? [cleaner.basePostcode] : [])])];
+        const locations = await tx.postcodeLocation.findMany({ where: { postcode: { in: postcodes } } });
+        const locationByPostcode = new Map(locations.map(location => [location.postcode, location]));
+        return cleaners.some(cleaner => coversPostcode({
+          bookingPostcode: postcode,
+          explicitPrefixes: cleaner.areas.map(area => area.postcodePrefix),
+          basePostcode: cleaner.basePostcode,
+          radiusKm: cleaner.serviceRadiusKm,
+          bookingLocation: locationByPostcode.get(postcode),
+          baseLocation: cleaner.basePostcode ? locationByPostcode.get(cleaner.basePostcode) : undefined,
+        }));
+      });
+      return NextResponse.json({ available, message: available ? "Great news! Cleaning services are available in your area." : "Sorry! We don't currently provide cleaning services in your area." }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return NextResponse.json({ error: "availability_check_failed" }, { status: 500 });
+    }
+  }
   const date = request.nextUrl.searchParams.get("date") ?? "";
   const durationMinutes = Number(request.nextUrl.searchParams.get("durationMinutes") ?? 0);
   if (!/^\d{5}$/.test(postcode) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || ![120, 180, 240].includes(durationMinutes)) return NextResponse.json({ error: "invalid_availability_query" }, { status: 400 });

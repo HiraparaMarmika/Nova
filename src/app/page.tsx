@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { SiteHeader } from "@/components/site-header";
 import { Reveal } from "@/components/reveal";
+import { PostcodeAvailabilityChecker } from "@/components/postcode-availability-checker";
 import { useLocale } from "@/lib/i18n";
 
 const Check = () => <span className="check-icon" aria-hidden="true">✓</span>;
@@ -21,11 +22,7 @@ export default function Home() {
           <span className="eyebrow"><span className="eyebrow-line" />{home.eyebrow}</span>
           <h1>{home.title1} <em>{home.title2}</em></h1>
           <p className="hero-description">{home.description}</p>
-          <form className="searchbox" action="/booking" method="get">
-            <div className="searchbox-top"><span className="search-icon" aria-hidden="true">⌖</span><strong>{home.searchTitle}</strong></div>
-            <div className="inputrow"><label className="sr-only" htmlFor="home-postcode">{home.postcode}</label><input id="home-postcode" name="postcode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder={home.postcodePlaceholder} required /><button className="button button-primary" type="submit">{home.check}<span aria-hidden="true">→</span></button></div>
-            <small>{home.coverage}</small>
-          </form>
+          <PostcodeAvailabilityChecker />
           <div className="trust-row" aria-label="NOVA benefits"><span><Check />{home.trust1}</span><span><Check />{home.trust2}</span><span><Check />{home.trust3}</span></div>
         </div>
         <div className="hero-visual" aria-label={home.sampleTitle}>
