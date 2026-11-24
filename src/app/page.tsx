@@ -44,7 +44,7 @@ export default function Home() {
         <div className="section-intro"><div><span className="eyebrow"><span className="eyebrow-line" />{home.sectionEyebrow}</span><h2 id="how-title">{home.sectionTitle}</h2></div><p className="muted">{home.sectionDescription}</p></div>
         <div className="grid3 steps-grid reveal-stagger">{[{ no: "01", mark: "⌖", title: home.step1Title, text: home.step1Text }, { no: "02", mark: "◌", title: home.step2Title, text: home.step2Text }, { no: "03", mark: "↗", title: home.step3Title, text: home.step3Text }].map(step => <article className="step-card" key={step.no}><span className="step-no">{step.no}</span><span className="step-art" aria-hidden="true">{step.mark}</span><h3>{step.title}</h3><p>{step.text}</p></article>)}</div>
       </Reveal>
-      <Reveal as="section" className="cta-wrap shell" id="enquiry" aria-labelledby="cta-title"><div className="cta-panel"><div><span className="eyebrow light">NOVA</span><h2 id="cta-title">{home.ctaTitle}</h2><p>{home.ctaText}</p></div><Link className="button button-light" href="/booking">{t.common.book} <span aria-hidden="true">→</span></Link></div></Reveal>
+      <Reveal as="section" className="cta-wrap shell" id="enquiry" aria-labelledby="cta-title"><div className="cta-panel"><div><span className="eyebrow light">NOVA</span><h2 id="cta-title">{home.ctaTitle}</h2><p>{home.ctaText}</p></div><Link className="button button-light" href="/customer/sign-in">{t.common.book} <span aria-hidden="true">→</span></Link></div></Reveal>
       <section className="sr-only" id="why-nova" aria-label="Why NOVA"><h2>{home.trust1}</h2><p>{home.trust2}. {home.trust3}.</p></section>
       <section className="sr-only" id="faq" aria-label="Frequently asked questions"><h2>FAQ</h2><p>{home.footer}</p></section>
     </main>
@@ -52,7 +52,7 @@ export default function Home() {
       <div className="shell home-footer-inner">
         <div className="home-footer-top">
           <div className="home-footer-brand"><Link href="/" aria-label="NOVA home"><span aria-hidden="true">✦</span>NOVA</Link><p>{home.footer}</p></div>
-          <nav className="home-footer-links" aria-label="Footer navigation"><Link href="#services">{t.nav.services}</Link><Link href="#how">{t.nav.how}</Link><Link href="/cleaner/register">{t.nav.forCleaners}</Link><Link href="/booking">{t.common.book}</Link></nav>
+          <nav className="home-footer-links" aria-label="Footer navigation"><Link href="#services">{t.nav.services}</Link><Link href="#how">{t.nav.how}</Link><Link href="/cleaner/register">{t.nav.forCleaners}</Link><Link href="/customer/sign-in">{t.common.book}</Link></nav>
         </div>
         <div className="home-footer-bottom"><span>© {new Date().getFullYear()} NOVA</span><span>{t.common.germany}</span><Link href="#top">Back to top <span aria-hidden="true">↑</span></Link></div>
       </div>
