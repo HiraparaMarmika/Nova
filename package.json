@@ -1,0 +1,44 @@
+{
+  "name": "nova-marketplace",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:demo": "node scripts/smoke-demo.mjs",
+    "test:portals": "node scripts/smoke-portals.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:set-password": "tsx scripts/set-password.ts",
+    "db:verify-demo": "node scripts/verify-demo-data.mjs",
+    "worker": "tsx src/worker.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "dotenv": "16.6.1",
+    "next": "15.5.7",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "server-only": "0.0.1",
+    "zod": "3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "prisma": "6.19.3",
+    "tsx": "4.19.3",
+    "typescript": "5.8.3",
+    "vitest": "3.1.2"
+  }
+}

@@ -1,0 +1,7 @@
+import { AccountType, BookingStatus } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getApiSession } from "@/lib/demo-session";
+import { prisma } from "@/lib/db";
+const schema = z.object({ rating: z.number().int().min(1).max(5), body: z.string().trim().max(1000).optional() });
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) { const session = await getApiSession(AccountType.CUSTOMER); const input = schema.safeParse(await request.json().catch(() => null)); if (!session || !input.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 }); const occurrence = await prisma.occurrence.findUnique({ where: { id: (await params).id }, include: { booking: { include: { customer: true } } } }); if (!occurrence || occurrence.booking.customer.accountId !== session.accountId) return NextResponse.json({ error: "forbidden" }, { status: 403 }); const reviewable: BookingStatus[] = [BookingStatus.COMPLETED, BookingStatus.CONFIRMED, BookingStatus.SETTLED]; if (!reviewable.includes(occurrence.status)) return NextResponse.json({ error: "not_reviewable" }, { status: 409 }); const review = await prisma.review.upsert({ where: { occurrenceId: occurrence.id }, update: input.data, create: { occurrenceId: occurrence.id, ...input.data } }); return NextResponse.json({ id: review.id }); }

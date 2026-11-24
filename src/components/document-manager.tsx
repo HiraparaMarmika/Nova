@@ -1,0 +1,23 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ReasonDialog } from "@/components/reason-dialog";
+import { useToast } from "@/components/toast-provider";
+import { getAdminCopy } from "@/lib/admin-copy";
+import { useLocale } from "@/lib/i18n";
+
+export type DocumentItem = { id: string; kind: string; status: string; originalName: string | null; createdAt: string; cleanerName?: string };
+
+export function CleanerDocuments({ documents }: { documents: DocumentItem[] }) {
+  const router = useRouter(); const { showToast, updateToast } = useToast(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  async function upload(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setError(""); const toast = showToast("Uploading private document...", "loading"); const response = await fetch("/api/cleaner/documents", { method: "POST", body: new FormData(event.currentTarget) }); if (response.ok) { updateToast(toast, "Document uploaded for review", "success"); event.currentTarget.reset(); router.refresh(); } else { setError("Choose a PDF, JPG or PNG file smaller than 5 MB."); updateToast(toast, "Document could not be uploaded", "error"); } setBusy(false); }
+  return <section className="card settings-panel"><div><span className="eyebrow">Private documents</span><h2>Verification files</h2><p className="muted">Files are stored outside the public website and are available only to you and administrators.</p></div><form className="document-upload" onSubmit={upload}><select name="kind" aria-label="Document type"><option value="IDENTITY">Identity</option><option value="TAX">Tax document</option><option value="INSURANCE">Insurance</option><option value="PHOTO">Profile photo</option></select><input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" aria-label="Choose verification document" required /><button className="button button-primary button-small" disabled={busy}>{busy ? "Uploading..." : "Upload"}</button></form>{error && <p className="form-error" role="alert">{error}</p>}<div className="document-list">{documents.map(item => <div key={item.id}><span><strong>{item.kind.replaceAll("_", " ")}</strong><small>{item.originalName ?? "Application declaration"}</small></span><span className="status">{item.status}</span>{item.originalName && <a className="text-link" href={`/api/documents/${item.id}/download`}>Download</a>}</div>)}</div></section>;
+}
+
+type DocumentDecision = { id: string; cleanerName: string; status: "APPROVED" | "REJECTED" };
+export function AdminDocumentReview({ documents }: { documents: DocumentItem[] }) {
+  const router = useRouter(); const { showToast, updateToast } = useToast(); const { locale } = useLocale(); const copy = getAdminCopy(locale); const [decision, setDecision] = useState<DocumentDecision | null>(null); const [busy, setBusy] = useState(false);
+  async function decide(reason: string) { if (!decision) return; setBusy(true); const toast = showToast(copy.messages.documentSaving, "loading"); const response = await fetch(`/api/documents/${decision.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: decision.status, reason }) }); if (response.ok) { updateToast(toast, copy.messages.documentSaved, "success"); setDecision(null); router.refresh(); } else updateToast(toast, copy.messages.documentFailed, "error"); setBusy(false); }
+  return <><div className="document-list">{documents.map(item => <div key={item.id}><span><strong>{item.cleanerName} &middot; {item.kind}</strong><small>{item.originalName ?? "—"} &middot; {new Date(item.createdAt).toLocaleDateString(locale === "de" ? "de-DE" : "en-GB")}</small></span><span className="status">{item.status}</span>{item.originalName && <a className="text-link" href={`/api/documents/${item.id}/download`}>{copy.actions.reviewFile}</a>}{item.status === "PENDING" && <div className="table-actions"><button className="button button-primary button-small" onClick={() => setDecision({ id: item.id, cleanerName: item.cleanerName ?? copy.labels.cleaner, status: "APPROVED" })}>{copy.actions.approve}</button><button className="button button-secondary button-small" onClick={() => setDecision({ id: item.id, cleanerName: item.cleanerName ?? copy.labels.cleaner, status: "REJECTED" })}>{copy.actions.reject}</button></div>}</div>)}</div><ReasonDialog open={Boolean(decision)} title={`${decision?.status === "APPROVED" ? copy.actions.approve : copy.actions.reject} ${decision?.cleanerName ?? copy.labels.cleaner}`} description={copy.messages.documentReason} confirmLabel={copy.actions.submitReview} busy={busy} onCancel={() => setDecision(null)} onConfirm={decide} /></>;
+}

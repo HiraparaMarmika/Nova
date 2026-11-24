@@ -1,0 +1,3 @@
+ALTER TABLE "Account"
+  DROP COLUMN IF EXISTS "mfaEnabled",
+  DROP COLUMN IF EXISTS "mfaSecret";

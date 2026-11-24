@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  CUSTOMER
+  CLEANER
+  ADMIN
+}
+enum AccountState {
+  ACTIVE
+  RESTRICTED
+  SUSPENDED
+  INVITED
+}
+enum OnboardingStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  NEEDS_CHANGES
+  REJECTED
+  APPROVED
+}
+enum BookingStatus {
+  DRAFT
+  REQUESTED
+  ACCEPTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CONFIRMED
+  SETTLED
+  DECLINED
+  EXPIRED
+  CANCELLED_BY_CUSTOMER
+  CANCELLED_BY_CLEANER
+  CANCELLED_BY_ADMIN
+  NO_SHOW
+  DISPUTED
+}
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  REQUIRES_ACTION
+  CAPTURED
+  RELEASED
+  REFUNDED
+  FAILED
+}
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  RETRY
+  FAILED
+}
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model Account {
+  id String @id @default(cuid())
+  email String
+  type AccountType
+  state AccountState @default(ACTIVE)
+  passwordHash String?
+  displayName String?
+  phone String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer?
+  cleaner Cleaner?
+  sessions Session[]
+  notifications Notification[]
+  sentBookingMessages BookingMessage[] @relation("BookingMessageSender")
+  invite AccountInvite?
+  @@unique([email,type])
+}
+model Session {
+  id String @id @default(cuid())
+  accountId String
+  account Account @relation(fields:[accountId],references:[id])
+  scope AccountType
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([accountId,scope])
+}
+model Customer {
+  id String @id @default(cuid())
+  accountId String @unique
+  account Account @relation(fields:[accountId],references:[id])
+  name String
+  phone String?
+  bookings Booking[]
+  createdAt DateTime @default(now())
+}
+model Cleaner {
+  id String @id @default(cuid())
+  accountId String @unique
+  account Account @relation(fields:[accountId],references:[id])
+  name String
+  bio String?
+  hourlyRateCents Int @default(3000)
+  onboarding OnboardingStatus @default(DRAFT)
+  connectPayoutsEnabled Boolean @default(false)
+  acceptingBookings Boolean @default(true)
+  publicPhotoKey String?
+  legalStatus String?
+  taxReference String?
+  basePostcode String?
+  serviceRadiusKm Int?
+  bookings Booking[]
+  areas ServiceArea[]
+  availability Availability[]
+  availabilityBlocks AvailabilityBlock[]
+  documents Document[]
+  payouts Payout[]
+  createdAt DateTime @default(now())
+  @@index([onboarding,connectPayoutsEnabled])
+}
+model PostcodeLocation {
+  postcode String @id
+  latitude Float
+  longitude Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model ServiceArea {
+  id String @id @default(cuid())
+  cleanerId String
+  cleaner Cleaner @relation(fields:[cleanerId],references:[id],onDelete:Cascade)
+  postcodePrefix String
+  @@unique([cleanerId,postcodePrefix])
+}
+model Availability {
+  id String @id @default(cuid())
+  cleanerId String
+  cleaner Cleaner @relation(fields:[cleanerId],references:[id],onDelete:Cascade)
+  weekday Int
+  startsAt String
+  endsAt String
+  active Boolean @default(true)
+  @@index([cleanerId,weekday])
+}
+model AvailabilityBlock {
+  id String @id @default(cuid())
+  cleanerId String
+  cleaner Cleaner @relation(fields:[cleanerId],references:[id],onDelete:Cascade)
+  date DateTime @db.Date
+  reason String
+  createdAt DateTime @default(now())
+  @@unique([cleanerId,date])
+  @@index([date])
+}
+model Booking {
+  id String @id @default(cuid())
+  customerId String
+  cleanerId String?
+  customer Customer @relation(fields:[customerId],references:[id])
+  cleaner Cleaner? @relation(fields:[cleanerId],references:[id])
+  postcode String
+  durationMinutes Int
+  extras Json
+  recurrenceWeeks Int?
+  seriesActive Boolean @default(true)
+  consentId String?
+  status BookingStatus @default(DRAFT)
+  createdAt DateTime @default(now())
+  occurrences Occurrence[]
+  messages BookingMessage[]
+  @@index([customerId,status])
+  @@index([cleanerId,status])
+}
+model Occurrence {
+  id String @id @default(cuid())
+  bookingId String
+  booking Booking @relation(fields:[bookingId],references:[id],onDelete:Cascade)
+  startsAt DateTime
+  timezone String @default("Europe/Berlin")
+  localStart String
+  status BookingStatus @default(REQUESTED)
+  financial FinancialSnapshot?
+  payment Payment?
+  history LifecycleEvent[]
+  review Review?
+  complaint Complaint?
+  invoice Invoice?
+  payout Payout?
+  confirmedAt DateTime?
+  settledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([bookingId,localStart])
+  @@index([status,startsAt])
+}
+model LifecycleEvent {
+  id String @id @default(cuid())
+  occurrenceId String
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id],onDelete:Cascade)
+  fromStatus BookingStatus?
+  toStatus BookingStatus
+  actorId String
+  reason String?
+  createdAt DateTime @default(now())
+  @@index([occurrenceId,createdAt])
+}
+model Consent {
+  id String @id @default(cuid())
+  customerId String
+  termsVersion String
+  acceptedAt DateTime @default(now())
+  revokedAt DateTime?
+  proof Json
+  mandateReference String?
+  @@index([customerId,acceptedAt])
+}
+model FinancialSnapshot {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id])
+  version Int @default(1)
+  currency String @default("EUR")
+  durationMinutes Int
+  rateCents Int
+  extrasCents Int
+  grossCents Int
+  commissionBps Int
+  commissionCents Int
+  cleanerNetCents Int
+  taxTreatment String
+  ruleVersion String
+  frozenAt DateTime @default(now())
+}
+model Payment {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id])
+  provider String
+  providerReference String? @unique
+  status PaymentStatus @default(PENDING)
+  authorizedCents Int @default(0)
+  capturedCents Int @default(0)
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  refunds Refund[]
+}
+model Refund {
+  id String @id @default(cuid())
+  paymentId String
+  payment Payment @relation(fields:[paymentId],references:[id])
+  amountCents Int
+  reason String
+  providerReference String?
+  createdAt DateTime @default(now())
+}
+model Complaint {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id])
+  reason String
+  status String @default("OPEN")
+  openedAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolution String?
+}
+model Review {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id])
+  rating Int
+  body String?
+  createdAt DateTime @default(now())
+}
+model Relationship {
+  id String @id @default(cuid())
+  customerId String
+  cleanerId String
+  recurringCompletedCount Int @default(0)
+  convertedFromOneTime Boolean @default(false)
+  @@unique([customerId,cleanerId])
+}
+model Document {
+  id String @id @default(cuid())
+  cleanerId String
+  cleaner Cleaner @relation(fields:[cleanerId],references:[id],onDelete:Cascade)
+  kind String
+  storageKey String @unique
+  approvedAt DateTime?
+  originalName String?
+  mimeType String?
+  sizeBytes Int?
+  status String @default("PENDING")
+  createdAt DateTime @default(now())
+  @@index([cleanerId,kind])
+}
+model WebhookEvent {
+  id String @id
+  provider String
+  payload Json
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+  @@index([processedAt])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  adminId String
+  action String
+  targetType String
+  targetId String
+  reason String
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([targetType,targetId,createdAt])
+}
+model AppConfig {
+  id String @id @default(cuid())
+  key String
+  version Int
+  value Json
+  activeAt DateTime @default(now())
+  @@unique([key,version])
+}
+model Job {
+  id String @id @default(cuid())
+  kind String
+  dedupeKey String @unique
+  payload Json
+  status JobStatus @default(QUEUED)
+  attempts Int @default(0)
+  runAt DateTime @default(now())
+  lastError String?
+  @@index([status,runAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+  accountId String
+  account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+  kind String
+  subject String
+  body String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([accountId,readAt,createdAt])
+}
+model BookingMessage {
+  id String @id @default(cuid())
+  bookingId String
+  booking Booking @relation(fields:[bookingId],references:[id],onDelete:Cascade)
+  senderAccountId String
+  sender Account @relation("BookingMessageSender",fields:[senderAccountId],references:[id],onDelete:Cascade)
+  body String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([bookingId,createdAt])
+  @@index([senderAccountId,createdAt])
+}
+
+model Invoice {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id],onDelete:Cascade)
+  number String @unique
+  amountCents Int
+  currency String @default("EUR")
+  status String @default("ISSUED")
+  issuedAt DateTime @default(now())
+}
+
+model Payout {
+  id String @id @default(cuid())
+  occurrenceId String @unique
+  occurrence Occurrence @relation(fields:[occurrenceId],references:[id],onDelete:Cascade)
+  cleanerId String
+  cleaner Cleaner @relation(fields:[cleanerId],references:[id])
+  amountCents Int
+  currency String @default("EUR")
+  status String @default("DEMO_PENDING")
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+  @@index([cleanerId,status,createdAt])
+}
+
+model WaitlistEntry {
+  id String @id @default(cuid())
+  email String
+  postcode String
+  status String @default("WAITING")
+  createdAt DateTime @default(now())
+  @@unique([email,postcode])
+  @@index([postcode,status])
+}
+
+model AccountInvite {
+  id String @id @default(cuid())
+  accountId String @unique
+  account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+  tokenHash String @unique
+  status InvitationStatus @default(PENDING)
+  reason String
+  invitedByAccountId String
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  lastSentAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@index([expiresAt,usedAt])
+}

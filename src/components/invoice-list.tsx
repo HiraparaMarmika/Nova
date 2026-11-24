@@ -1,0 +1,3 @@
+export function InvoiceList({ invoices }: { invoices: { id: string; number: string; amount: string; issuedAt: string; status: string }[] }) {
+  return <div className="document-list">{invoices.length ? invoices.map(item => <div key={item.id}><span><strong>{item.number}</strong><small>Issued {new Date(item.issuedAt).toLocaleDateString("en-GB")} · {item.amount}</small></span><span className="status">{item.status}</span><a className="button button-secondary button-small" href={`/api/invoices/${item.id}`} target="_blank" rel="noreferrer">Open invoice</a></div>) : <div className="table-empty"><strong>No invoices yet</strong><span>An invoice is issued after a visit is settled.</span></div>}</div>;
+}
