@@ -56,7 +56,7 @@ export function SignInView({ portal }: { portal: Portal }) {
           window.setTimeout(() => window.location.assign(`/${body.portal}/sign-in`), 900);
           return;
         }
-        const message = body?.error === "cleaner_pending" ? "Your application is currently under review. You will be notified once it is approved." : body?.error === "cleaner_rejected" ? "Your application has not been approved. Please contact the administration team for more information." : body?.error === "account_suspended" ? "Your account has been suspended. Please contact support for assistance." : response.status === 503 ? t.auth.demoUnavailable : response.status === 401 ? "The email or password is incorrect." : body?.error === "account_unavailable" ? "This account is not available for sign-in." : t.auth.networkError;
+        const message = body?.error === "cleaner_pending" || body?.error === "customer_pending" ? "Your account is currently under review. You will be notified once it is approved." : body?.error === "cleaner_rejected" || body?.error === "customer_rejected" ? "Your account has not been approved. Please contact the administration team for more information." : body?.error === "account_suspended" ? "Your account has been suspended. Please contact support for assistance." : response.status === 503 ? t.auth.demoUnavailable : response.status === 401 ? "The email or password is incorrect." : body?.error === "account_unavailable" ? "This account is not available for sign-in." : t.auth.networkError;
         setError(message);
         updateToast(toastId, message, "error");
         setBusy(false);

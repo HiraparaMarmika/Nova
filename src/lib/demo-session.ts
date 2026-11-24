@@ -22,8 +22,8 @@ export async function createDemoSession(accountId: string, scope: AccountType) {
 async function readSession(allowInactive = false) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-  const session = await prisma.session.findUnique({ where: { id: tokenDigest(token) }, include: { account: { include: { cleaner: { select: { onboarding: true } } } } } });
-  if (!session || session.expiresAt <= new Date() || (!allowInactive && session.account.state !== AccountState.ACTIVE) || session.scope !== session.account.type || (session.scope === AccountType.CLEANER && session.account.cleaner?.onboarding !== "APPROVED")) return null;
+  const session = await prisma.session.findUnique({ where: { id: tokenDigest(token) }, include: { account: { include: { cleaner: { select: { onboarding: true } }, customer: { select: { approvalStatus: true } } } } } });
+  if (!session || session.expiresAt <= new Date() || (!allowInactive && session.account.state !== AccountState.ACTIVE) || session.scope !== session.account.type || (session.scope === AccountType.CLEANER && session.account.cleaner?.onboarding !== "APPROVED") || (session.scope === AccountType.CUSTOMER && session.account.customer?.approvalStatus !== "APPROVED")) return null;
   return session;
 }
 

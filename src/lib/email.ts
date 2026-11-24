@@ -58,7 +58,8 @@ export async function deliverQueuedEmail(payload: unknown) {
   if (!isQueuedEmail(payload)) throw new Error("invalid_email_payload");
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) throw new Error("email_not_configured");
+  const missing = [!apiKey && "RESEND_API_KEY", !from && "EMAIL_FROM"].filter(Boolean);
+  if (missing.length) throw new Error("email_not_configured:" + missing.join(","));
   const rendered = renderEmail(payload);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",

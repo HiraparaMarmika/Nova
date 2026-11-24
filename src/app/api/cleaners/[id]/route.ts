@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getApiSession } from "@/lib/demo-session";
 import { prisma } from "@/lib/db";
-import { sendCleanerApprovalEmail } from "@/lib/email";
+import { queueAccountEmail } from "@/lib/email";
+import { appUrl } from "@/domain/operations";
 
 const inputSchema = z.object({ onboarding: z.enum(["APPROVED", "REJECTED", "NEEDS_CHANGES"]), reason: z.string().trim().min(3).max(500) });
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,19 +12,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const input = inputSchema.safeParse(await request.json().catch(() => null)); if (!input.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   const onboarding = input.data.onboarding as OnboardingStatus; const id = (await params).id;
   try {
-    const cleaner = await prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async tx => {
+      const current = await tx.cleaner.findUnique({ where: { id }, include: { account: true } });
+      if (!current) throw new Error("not_found");
+      if (current.onboarding === onboarding) return { cleaner: current, changed: false };
+      if (![OnboardingStatus.SUBMITTED, OnboardingStatus.UNDER_REVIEW, OnboardingStatus.NEEDS_CHANGES].includes(current.onboarding)) throw new Error("already_decided");
       const updated = await tx.cleaner.update({ where: { id }, data: { onboarding, connectPayoutsEnabled: onboarding === OnboardingStatus.APPROVED }, include: { account: true } });
       await tx.account.update({ where: { id: updated.accountId }, data: { state: onboarding === OnboardingStatus.APPROVED ? AccountState.ACTIVE : AccountState.RESTRICTED } });
       if (onboarding !== OnboardingStatus.APPROVED) await tx.session.deleteMany({ where: { accountId: updated.accountId } });
       await tx.auditLog.create({ data: { adminId: session.accountId, action: `CLEANER_${onboarding}`, targetType: "Cleaner", targetId: id, reason: input.data.reason, metadata: { accountId: updated.accountId, email: updated.account.email } } });
       await tx.notification.create({ data: { accountId: updated.accountId, kind: "APPLICATION_REVIEW", subject: `Application ${onboarding.toLowerCase().replaceAll("_", " ")}`, body: onboarding === OnboardingStatus.APPROVED ? "Your cleaner application has been approved. You can now sign in and manage your profile." : input.data.reason } });
-      return updated;
+      if (onboarding === OnboardingStatus.APPROVED) await queueAccountEmail(tx, { accountId: updated.accountId, eventKey: `cleaner-approval:${updated.id}`, subject: "Your NOVA Cleaner Application Has Been Approved!", title: "Your cleaner application is approved", greeting: updated.name, message: "Congratulations! Your NOVA cleaner application has been approved. You can now sign in with your registered email address and password to manage your profile and availability.", action: { label: "Sign in to your Cleaner Portal", url: appUrl("/cleaner/sign-in") } });
+      return { cleaner: updated, changed: true };
     });
-    let emailDelivery: { delivered: boolean; reason?: string } = { delivered: false, reason: "not_required" };
-    if (onboarding === OnboardingStatus.APPROVED) {
-      try { emailDelivery = await sendCleanerApprovalEmail({ to: cleaner.account.email, name: cleaner.name, loginUrl: new URL("/cleaner/sign-in", process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin).toString() }); }
-      catch { emailDelivery = { delivered: false, reason: "email_delivery_failed" }; }
-    }
-    return NextResponse.json({ id: cleaner.id, onboarding: cleaner.onboarding, accountState: onboarding === OnboardingStatus.APPROVED ? AccountState.ACTIVE : AccountState.RESTRICTED, emailDelivery });
-  } catch { return NextResponse.json({ error: "cleaner_update_failed" }, { status: 404 }); }
+    return NextResponse.json({ id: result.cleaner.id, onboarding: result.cleaner.onboarding, accountState: result.cleaner.account.state, changed: result.changed, emailQueued: result.changed && onboarding === OnboardingStatus.APPROVED });
+  } catch (error) { if (error instanceof Error && error.message === "not_found") return NextResponse.json({ error: "cleaner_not_found" }, { status: 404 }); if (error instanceof Error && error.message === "already_decided") return NextResponse.json({ error: "cleaner_already_decided" }, { status: 409 }); return NextResponse.json({ error: "cleaner_update_failed" }, { status: 409 }); }
 }

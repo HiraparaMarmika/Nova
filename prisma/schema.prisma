@@ -26,6 +26,12 @@ enum OnboardingStatus {
   REJECTED
   APPROVED
 }
+enum CustomerApprovalStatus {
+  PENDING
+  NEEDS_CHANGES
+  REJECTED
+  APPROVED
+}
 enum BookingStatus {
   DRAFT
   REQUESTED
@@ -99,8 +105,10 @@ model Customer {
   account Account @relation(fields:[accountId],references:[id])
   name String
   phone String?
+  approvalStatus CustomerApprovalStatus @default(PENDING)
   bookings Booking[]
   createdAt DateTime @default(now())
+  @@index([approvalStatus,createdAt])
 }
 model Cleaner {
   id String @id @default(cuid())

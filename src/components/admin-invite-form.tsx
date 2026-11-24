@@ -18,7 +18,7 @@ export function AdminInviteForm() {
       const response = await fetch("/api/admin/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: values.get("email"), reason: values.get("reason") }) });
       const body = await response.json().catch(() => ({}));
       if (response.ok) {
-        updateToast(toast, body.delivery?.delivered ? copy.messages.inviteSent : copy.messages.inviteCreated, body.delivery?.delivered ? "success" : "error");
+        updateToast(toast, body.delivery?.queued ? "Invitation queued for delivery" : copy.messages.inviteCreated, body.delivery?.queued ? "success" : "error");
         form.reset();
         router.refresh();
       } else {

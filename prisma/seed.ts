@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { AccountState, AccountType, BookingStatus, OnboardingStatus, PaymentStatus, PrismaClient } from "@prisma/client";
+import { AccountState, AccountType, BookingStatus, CustomerApprovalStatus, OnboardingStatus, PaymentStatus, PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
@@ -35,8 +35,8 @@ async function main() {
 
   const anna = await prisma.customer.upsert({
     where: { accountId: annaAccount.id },
-    update: { name: "Anna Becker" },
-    create: { accountId: annaAccount.id, name: "Anna Becker", phone: "+49 30 000000" }
+    update: { name: "Anna Becker", approvalStatus: CustomerApprovalStatus.APPROVED },
+    create: { accountId: annaAccount.id, name: "Anna Becker", phone: "+49 30 000000", approvalStatus: CustomerApprovalStatus.APPROVED }
   });
   const leonie = await prisma.cleaner.upsert({
     where: { accountId: leonieAccount.id },

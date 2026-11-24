@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const portal = input.data.portal;
   const type = portal.toUpperCase() as AccountType;
   const email = input.data.email.trim().toLowerCase();
-  const account = await prisma.account.findUnique({ where: { email_type: { email, type } }, include: { cleaner: { select: { onboarding: true } } } });
+  const account = await prisma.account.findUnique({ where: { email_type: { email, type } }, include: { cleaner: { select: { onboarding: true } }, customer: { select: { approvalStatus: true } } } });
   if (!account) {
     const accountInAnotherPortal = await prisma.account.findFirst({ where: { email }, select: { type: true } });
     if (accountInAnotherPortal) return NextResponse.json({ error: "wrong_portal", portal: accountInAnotherPortal.type.toLowerCase() }, { status: 409 });
@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
   }
   if (type === AccountType.CLEANER && account.cleaner?.onboarding !== "APPROVED") {
     const error = account.cleaner?.onboarding === "REJECTED" ? "cleaner_rejected" : "cleaner_pending";
+    return NextResponse.json({ error }, { status: 403 });
+  }
+  if (type === AccountType.CUSTOMER && account.customer?.approvalStatus !== "APPROVED") {
+    const error = account.customer?.approvalStatus === "REJECTED" ? "customer_rejected" : "customer_pending";
     return NextResponse.json({ error }, { status: 403 });
   }
   if (account.state === AccountState.SUSPENDED) return NextResponse.json({ error: "account_suspended" }, { status: 403 });
